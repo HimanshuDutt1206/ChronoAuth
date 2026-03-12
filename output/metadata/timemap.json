@@ -1,0 +1,38 @@
+[
+    {
+        "frame_id": 8,
+        "strip_idx": 0,
+        "y1": 0,
+        "y2": 53
+    },
+    {
+        "frame_id": 7,
+        "strip_idx": 1,
+        "y1": 53,
+        "y2": 106
+    },
+    {
+        "frame_id": 12,
+        "strip_idx": 2,
+        "y1": 106,
+        "y2": 159
+    },
+    {
+        "frame_id": 2,
+        "strip_idx": 3,
+        "y1": 159,
+        "y2": 212
+    },
+    {
+        "frame_id": 1,
+        "strip_idx": 4,
+        "y1": 212,
+        "y2": 265
+    },
+    {
+        "frame_id": 10,
+        "strip_idx": 5,
+        "y1": 265,
+        "y2": 320
+    }
+]
