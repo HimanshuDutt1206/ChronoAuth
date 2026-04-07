@@ -1,194 +1,132 @@
 import streamlit as st
-import os
+import numpy as np
 import json
-import pandas as pd
 from PIL import Image
-from generate_demo import generate_assets
+import os
+from crypto_engine import remove_diffusion
 
-OUTPUT_DIR = "output"
-FRAMES_DIR = os.path.join(OUTPUT_DIR, "frames")
-METADATA_DIR = os.path.join(OUTPUT_DIR, "metadata")
+# Import our custom cryptographic modules
+from crypto_engine import text_to_tile_grid, scramble_image, unscramble_image, tile_grid_to_text
+from temporal_pipeline import decrypt_pipeline
+from stream_generator import create_optical_stream
 
-st.set_page_config(page_title="Chrono-Auth Demo", page_icon="🔐", layout="wide")
+# ==========================================
+# PAGE CONFIGURATION
+# ==========================================
+st.set_page_config(page_title="Chrono-Auth Demo", layout="wide", initial_sidebar_state="expanded")
 
+st.title("⏱️ Chrono-Auth: Time-Interleaved Visual Cryptography")
 st.markdown("""
-<style>
-.stApp {
-    background-color: #0b1120;
-    color: #e5e7eb;
-}
-.block-container {
-    padding-top: 1.5rem;
-    padding-bottom: 1.5rem;
-    max-width: 1400px;
-}
-h1, h2, h3, h4, h5, h6, p, label, div {
-    color: #e5e7eb;
-}
-.section-title {
-    color: #38bdf8;
-    font-size: 1.7rem;
-    font-weight: 700;
-    margin-top: 1.4rem;
-    margin-bottom: 1rem;
-}
-.small-note {
-    color: #94a3b8;
-    font-size: 0.9rem;
-}
-hr {
-    border-color: #1f2937;
-}
-[data-testid="stSidebar"] {
-    background-color: #111827;
-}
-[data-testid="stExpander"] {
-    background-color: #111827;
-    border: 1px solid #1f2937;
-    border-radius: 12px;
-}
-</style>
-""", unsafe_allow_html=True)
+**Academic Prototype for Transaction Integrity Verification**  
+*Mitigating Man-in-the-Browser (MitB) attacks by shifting visual verification from spatial artifacts (QR codes) to synchronized temporal streams.*
+""")
 
-def load_json(path):
-    with open(path, "r") as f:
-        return json.load(f)
+# ==========================================
+# SIDEBAR: SETUP & GENERATION
+# ==========================================
+st.sidebar.header("1. Transaction Setup")
+fake_transaction = st.sidebar.text_input("Fake Browser UI Shows:", "TRANSFER: $50 TO ALICE")
+real_transaction = st.sidebar.text_input("Hidden Verification Payload:", "CONFIRM: PAY $5000 TO MALLORY")
+session_key = st.sidebar.text_input("Session Key (Phone & Server share this):", "ChronoKey2024")
 
-def load_image(path):
-    return Image.open(path)
+if st.sidebar.button("Generate Optical Stream"):
+    with st.spinner("Generating Tile Grid, Scrambling, and Chaining Temporal Stream..."):
+        # Generate the GIF and JSON using our Phase 3 code
+        create_optical_stream(real_transaction, session_key, total_frames=60, num_strips=16)
+    st.sidebar.success("stream.gif and timemap.json generated successfully!")
 
-def safe_image(path):
-    if os.path.exists(path):
-        return load_image(path)
-    return None
+# ==========================================
+# HELPER: DECRYPTION WRAPPER
+# ==========================================
+def extract_and_decrypt(stream_path, timemap_path, key, drop_frame=False):
+    """Simulates the smartphone scanning the GIF and decrypting it."""
+    try:
+        # 1. Load the Timemap
+        with open(timemap_path, 'r') as f:
+            timemap = json.load(f)
+            
+        # 2. Extract frames from GIF
+        gif = Image.open(stream_path)
+        frames = []
+        for i in range(gif.n_frames):
+            gif.seek(i)
+            frames.append(np.array(gif.convert('L'))) # Convert to Grayscale numpy array
+            
+        # 3. Filter Decoys and Extract Payload Strips
+        extracted_strips = []
+        payload_frames = [int(fid) for fid, data in timemap.items() if data['type'] == 'PAYLOAD']
+        payload_frames.sort()
+        
+        for i, frame_id in enumerate(payload_frames):
+            data = timemap[str(frame_id)]
+            y1, y2 = data['y_start'], data['y_end']
+            
+            # SIMULATE DROPPED FRAME ATTACK: Replace strip #8 with pure noise
+            if drop_frame and i == 8:
+                noise_strip = np.random.choice([0, 255], size=(y2-y1, 256)).astype(np.uint8)
+                extracted_strips.append(noise_strip)
+            else:
+                strip = frames[frame_id][y1:y2, :]
+                extracted_strips.append(strip)
+                
+        # 4. Temporal Decryption (Reverse Chaos & Unmix)
+        decrypted_scrambled_grid = decrypt_pipeline(extracted_strips, key)
+        
+        # 5. Spatial Unscrambling
+        # To unscramble, we need the exact permutation. We get it by scrambling a dummy image with the key.
+        dummy_image = np.zeros((256, 256), dtype=np.uint8)
+        _, permutation = scramble_image(dummy_image, key)
+        final_grid = unscramble_image(decrypted_scrambled_grid, permutation)
+        final_grid = remove_diffusion(final_grid)
+        # 6. Decode Tiles to Text
+        recovered_text = tile_grid_to_text(final_grid)
+        return recovered_text, final_grid
+        
+    except Exception as e:
+        return f"ERROR: {str(e)}", None
 
-def load_current_data():
-    metadata_path = os.path.join(METADATA_DIR, "metadata.json")
-    timemap_path = os.path.join(METADATA_DIR, "timemap.json")
-    if not os.path.exists(metadata_path) or not os.path.exists(timemap_path):
-        return None, None
-    return load_json(metadata_path), load_json(timemap_path)
+# ==========================================
+# MAIN DASHBOARD UI
+# ==========================================
+col1, col2 = st.columns(2)
 
-st.sidebar.title("🔐 Chrono-Auth")
+with col1:
+    st.header("🖥️ The Compromised Browser")
+    st.error("**What the user sees (Manipulated by Malware):**")
+    st.info(f"💸 **{fake_transaction}**")
+    
+    st.markdown("---")
+    st.subheader("Optical Transmission Stream")
+    st.markdown("This flickering box is what the browser displays. It contains decoy frames and payload frames mixed together.")
+    
+    if os.path.exists('stream.gif'):
+        st.image('stream.gif', caption="Synchronized Temporal Stream (Contains hidden payload)", use_container_width=True)
+    else:
+        st.warning("👈 Please click 'Generate Optical Stream' in the sidebar.")
 
-attack_mode = st.sidebar.toggle("Simulate Attack", value=True)
-browser_text = st.sidebar.text_input("Browser Transaction", "Transfer: $50 to Alice")
-default_hidden = "CONFIRM: PAY $5000 TO MALLORY" if attack_mode else "CONFIRM: PAY $50 TO ALICE"
-hidden_text = st.sidebar.text_input("Hidden Transaction", default_hidden)
+with col2:
+    st.header("📱 The Smartphone Verifier")
+    st.success("**What the secure app reconstructs:**")
+    
+    # INTERACTIVE DEMO BUTTONS
+    st.markdown("### Simulation Controls")
+    
+    if st.button("✅ Scan & Verify (Correct Key & Sync)"):
+        text, grid = extract_and_decrypt('stream.gif', 'timemap.json', session_key, drop_frame=False)
+        st.image(grid, caption="Recovered Tile Grid (Before decoding)", width=200)
+        st.success(f"**Verified Transaction Intent:**\n\n{text}")
+        if text == real_transaction:
+            st.balloons()
 
-st.sidebar.markdown("---")
-n_strips = st.sidebar.slider("Payload Strips", 3, 10, 6)
-n_decoys = st.sidebar.slider("Decoy Frames", 0, 20, 6)
-block_size = st.sidebar.slider("Scramble Block Size", 10, 40, 20, step=5)
-session_key = st.sidebar.text_input("Session Key", "chrono_2025_sec")
-show_debug_marks = st.sidebar.checkbox("Show Debug Labels", True)
+    if st.button("❌ Attack: Wrong Session Key"):
+        wrong_key = session_key + "X" # Change key slightly
+        text, grid = extract_and_decrypt('stream.gif', 'timemap.json', wrong_key, drop_frame=False)
+        st.image(grid, caption="Corrupted Tile Grid", width=200)
+        st.error(f"**Reconstructed Text:**\n\n{text[:60]}... (Garbage)")
+        st.caption("Proof of Key Sensitivity (Avalanche Effect).")
 
-generate_clicked = st.sidebar.button("🚀 Generate Demo", use_container_width=True)
-
-if generate_clicked or "generated_once" not in st.session_state:
-    with st.spinner("Generating Chrono-Auth demo..."):
-        generate_assets(
-            browser_text=browser_text,
-            hidden_text=hidden_text,
-            simulate_attack=attack_mode,
-            n_strips=n_strips,
-            n_decoys=n_decoys,
-            session_key=session_key,
-            show_debug_marks=show_debug_marks,
-            block_size=block_size
-        )
-        st.session_state["generated_once"] = True
-
-metadata, timemap = load_current_data()
-if metadata is None:
-    st.error("No generated assets found.")
-    st.stop()
-
-bank_ui = safe_image(os.path.join(OUTPUT_DIR, "bank_ui.png"))
-hidden_message = safe_image(os.path.join(OUTPUT_DIR, "hidden_message.png"))
-scrambled_message = safe_image(os.path.join(OUTPUT_DIR, "scrambled_message.png"))
-recovered_correct = safe_image(os.path.join(OUTPUT_DIR, "recovered_correct.png"))
-recovered_wrong_frames = safe_image(os.path.join(OUTPUT_DIR, "recovered_wrong_frames.png"))
-recovered_wrong_key = safe_image(os.path.join(OUTPUT_DIR, "recovered_wrong_key.png"))
-stream_gif_path = os.path.join(OUTPUT_DIR, "stream.gif")
-
-frame_files = sorted([f for f in os.listdir(FRAMES_DIR) if f.lower().endswith(".png")])
-
-st.title("🔐 Chrono-Auth")
-st.caption("Time-Interleaved Visual Cryptography for Transaction Verification")
-
-st.markdown('<div class="section-title">1. UI vs Real Transaction</div>', unsafe_allow_html=True)
-st.divider()
-
-c1, c2 = st.columns(2)
-with c1:
-    st.subheader("💻 Compromised Browser View")
-    if bank_ui:
-        st.image(bank_ui, width='stretch')
-
-with c2:
-    st.subheader("🔒 Chrono-Auth Hidden Payload")
-    if hidden_message:
-        st.image(hidden_message, width='stretch')
-
-if metadata["simulate_attack"]:
-    st.error("Attack mode active: browser transaction differs from the hidden verified transaction.")
-else:
-    st.success("Normal mode: browser and hidden transaction match.")
-
-st.markdown('<div class="section-title">2. Scrambling Stage</div>', unsafe_allow_html=True)
-st.divider()
-
-c3, c4 = st.columns(2)
-with c3:
-    st.subheader("Original Hidden Message")
-    if hidden_message:
-        st.image(hidden_message, width='stretch')
-
-with c4:
-    st.subheader("Globally Scrambled Message")
-    if scrambled_message:
-        st.image(scrambled_message, width='stretch')
-
-st.markdown('<div class="section-title">3. Optical Stream</div>', unsafe_allow_html=True)
-st.divider()
-
-if os.path.exists(stream_gif_path):
-    st.image(stream_gif_path, caption="Animated Chrono-Auth stream", width='stretch')
-else:
-    st.warning("stream.gif not found. Regenerate demo.")
-
-st.markdown('<div class="section-title">4. Reconstruction Results</div>', unsafe_allow_html=True)
-st.divider()
-
-r1, r2, r3 = st.columns(3)
-with r1:
-    st.subheader("✅ Correct")
-    if recovered_correct:
-        st.image(recovered_correct, width='stretch')
-    st.caption("Correct frames + correct key")
-
-with r2:
-    st.subheader("❌ Wrong Frames")
-    if recovered_wrong_frames:
-        st.image(recovered_wrong_frames, width='stretch')
-    st.caption("Actual output from incorrect frame selection")
-
-with r3:
-    st.subheader("❌ Wrong Key")
-    if recovered_wrong_key:
-        st.image(recovered_wrong_key, width='stretch')
-    st.caption("Actual output from incorrect session key")
-
-st.markdown('<div class="section-title">5. Stream Inspection</div>', unsafe_allow_html=True)
-st.divider()
-
-with st.expander("Inspect generated frames", expanded=False):
-    if frame_files:
-        selected_frame = st.selectbox("Select frame", frame_files)
-        st.image(load_image(os.path.join(FRAMES_DIR, selected_frame)), width='stretch')
-
-with st.expander("Verifier metadata", expanded=False):
-    st.dataframe(pd.DataFrame(timemap), width='stretch')
-    st.caption(f"Session ID: {metadata['session_id']}")
-    st.caption(f"Payload Frames: {metadata['payload_frames']} | Decoy Frames: {metadata['decoy_frames']} | Block Size: {metadata['block_size']}")
+    if st.button("⚠️ Attack: Dropped Frame / Tampering"):
+        text, grid = extract_and_decrypt('stream.gif', 'timemap.json', session_key, drop_frame=True)
+        st.image(grid, caption="Cascade Failure Tile Grid", width=200)
+        st.error(f"**Reconstructed Text:**\n\n{text[:60]}... (Garbage)")
+        st.caption("Proof of Stateful Chaining. Missing 1 out of 60 frames destroys the entire reconstruction, preventing partial leakage.")

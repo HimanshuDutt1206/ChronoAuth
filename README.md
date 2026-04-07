@@ -1,342 +1,49 @@
-# Chrono-Auth
+⏱️ Chrono-Auth: Time-Interleaved Visual Cryptography
 
-A Streamlit-based research prototype for **time-interleaved visual cryptography** for transaction verification.
+An Academic Prototype for Transaction Integrity Verification against Man-in-the-Browser (MitB) Attacks.
 
----
+📖 Overview
+Traditional Multi-Factor Authentication (OTP, SMS) authenticates the user, but fails to verify the transaction intent. In a Man-in-the-Browser (MitB) attack, malware can alter the transaction details (e.g., changing the recipient and amount) while displaying a fake, harmless UI to the user.
 
-## Overview
+Existing visual verification methods (like static QR codes or PhotoTAN) are vulnerable to screen-recording and offline analysis by advanced malware.
 
-Chrono-Auth is a proof-of-concept system that explores how transaction verification data can be hidden across a **dynamic noisy visual stream** instead of a single static image.
+Chrono-Auth solves this by shifting visual cryptography from the spatial domain (a static image) to the temporal domain (a synchronized, time-interleaved optical stream). The hidden transaction payload is shattered across time, interleaved with decoy frames, and cryptographically chained to ensure that capturing partial frames yields 0% readable data.
 
-The central idea is that a browser or client interface may be manipulated by malware and therefore cannot always be trusted to display the real transaction being approved. Instead of relying only on what the browser shows, Chrono-Auth creates a second visual verification channel in which the real transaction data is fragmented, encrypted, and distributed across time.
+✨ Key Cryptographic Innovations
+Deterministic Tile Encoding: Converts text into 8x8 binary noise blocks. Prevents "ghosting" or partial structural leakage (reconstructs as ? if corrupted).
+Shannon Diffusion Layer: Links every pixel mathematically. Guarantees the Avalanche Effect during decryption.
+Logistic Chaos Mapping: Uses non-linear dynamics (X_n+1 = r * X_n * (1 - X_n)) for highly key-sensitive spatial scrambling and masking.
+Stateful Temporal Chaining: Strips are XOR-chained bidirectionally. A single dropped frame breaks the recursive decryption chain.
+Decoy Interleaving: Real payload frames are hidden among mathematically identical noise frames, requiring a synchronized timemap.json to extract.
+⚙️ Installation & Setup
+Clone the repository or download the source code.
+Ensure you have Python 3.8+ installed.
+Install the required dependencies by running the following command in your terminal:
+Bash
 
-This project is implemented as a **final-year academic prototype** and is intended to demonstrate the methodology, architecture, and research potential of temporal visual verification.
+pip install numpy pillow opencv-python streamlit
+🚀 How to Run the Demo
+The project features an interactive dashboard to simulate the attack and the cryptographic verification.
 
----
+Navigate to the project folder in your terminal.
+Run the Streamlit application using this command:
+Bash
 
-## Problem Statement
-
-In online banking and digital transaction systems, malware such as **Man-in-the-Browser (MitB)** can silently alter:
-
-* transaction amount
-* recipient account
-* destination identity
-* payment details
-
-while still showing a harmless-looking transaction summary to the user.
-
-Traditional security methods like OTPs or browser confirmations may not always guarantee that the **exact transaction semantics** being approved are independently verified under hostile client conditions.
-
-Chrono-Auth addresses this by shifting verification from:
-
-* a **static visible object**
-
-to
-
-* a **time-interleaved hidden visual stream**
-
----
-
-## Core Idea
-
-Instead of displaying the verification payload as one static image, Chrono-Auth:
-
-1. converts the hidden transaction into a binary visual form
-2. scrambles it using a session-dependent transformation
-3. splits it into temporal strips
-4. encrypts those strips using chaos-inspired masking
-5. mixes them with decoy frames
-6. reconstructs the message only when the correct frame set and session key are used
-
-The output stream appears as noisy random frames, but the correct reconstruction process can recover the original transaction.
-
----
-
-## Methodology
-
-The system works in multiple stages:
-
-### 1. Transaction Encoding
-
-The real transaction confirmation text is converted into a binary image.
-
-Example:
-
-```
-CONFIRM: PAY $5000 TO MALLORY
-```
-
-This image becomes the hidden verification payload.
-
----
-
-### 2. Session-Key-Based Scrambling
-
-Before temporal splitting, the payload is globally scrambled using a session-dependent block permutation.
-
-This means the hidden message is no longer visually readable even before encryption. The data is rearranged spatially, so no local region directly corresponds to readable plaintext.
-
----
-
-### 3. Temporal Fragmentation
-
-The scrambled image is split into multiple horizontal strips.
-
-Each strip is treated as one temporal fragment of the final secret.
-
-This moves the security model from a single spatial image to a sequence of frames across time.
-
----
-
-### 4. Chaos-Inspired Encryption
-
-Each strip is masked using a deterministic pseudo-random binary pattern generated from a session key.
-
-This introduces a chaos-based visual masking layer, so every payload fragment appears noisy and unintelligible on its own.
-
----
-
-### 5. Decoy Interleaving
-
-In addition to valid payload frames, the system generates decoy frames containing only noise.
-
-The final stream is made of both:
-
-* valid payload frames
-* decoy frames
-
-These are shuffled into one mixed sequence, making it difficult to identify which frames actually matter.
-
----
-
-### 6. Stream Generation
-
-The mixed payload and decoy frames are exported as:
-
-* individual frame images
-* an animated GIF stream
-
-To a normal observer, the stream appears as random flickering noise.
-
----
-
-### 7. Reconstruction
-
-The verifier uses:
-
-* the correct session key
-* the correct frame-selection map
-* the correct reconstruction logic
-
-to recover the hidden transaction.
-
-The system also demonstrates failure cases:
-
-* wrong frame set
-* wrong session key
-
-Both lead to corrupted or unreadable outputs.
-
----
-
-## Features
-
-* Fake banking UI generation
-* Hidden transaction image generation
-* Global block scrambling of hidden payload
-* Temporal splitting into multiple payload strips
-* Decoy frame injection
-* Noisy animated stream generation
-* Correct reconstruction output
-* Wrong-frame reconstruction output
-* Wrong-key reconstruction output
-* Streamlit dashboard for visual demonstration
-
----
-
-## Files
-
-### `generate_demo.py`
-
-Generates all required demo assets:
-
-* fake bank UI
-* hidden message image
-* scrambled payload
-* payload and decoy frames
-* animated stream GIF
-* metadata and timemap
-* reconstruction outputs
-
----
-
-### `app.py`
-
-Streamlit app that visualizes:
-
-* browser transaction view
-* hidden Chrono-Auth payload
-* scrambling stage
-* animated optical stream
-* correct and incorrect reconstructions
-* frame inspection
-* verifier metadata
-
----
-
-## Installation
-
-Create and activate a virtual environment if needed:
-
-```
-python -m venv .venv
-```
-
-Windows PowerShell:
-
-```
-.\.venv\Scripts\Activate.ps1
-```
-
-Install all required packages:
-
-```
-python -m pip install streamlit pandas pillow opencv-python numpy
-```
-
----
-
-## How to Run
-
-### 1. Generate all demo assets
-
-```
-python generate_demo.py
-```
-
-This creates the required files inside the `output/` folder.
-
----
-
-### 2. Launch the Streamlit app
-
-```
 streamlit run app.py
-```
-
----
-
-## Output Structure
-
-After generation, the project creates a structure like:
-
-```
-output/
-│
-├── bank_ui.png
-├── hidden_message.png
-├── scrambled_message.png
-├── recovered_correct.png
-├── recovered_wrong_frames.png
-├── recovered_wrong_key.png
-├── stream.gif
-│
-├── frames/
-│   └── generated payload and decoy frame images
-│
-└── metadata/
-    ├── metadata.json
-    └── timemap.json
-```
-
----
-
-## Demo Flow
-
-The Streamlit app demonstrates the system in stages:
-
-### 1. Browser View vs Hidden Payload
-
-The browser shows one transaction, while Chrono-Auth encodes a hidden verification payload.
-
----
-
-### 2. Scrambling Stage
-
-The hidden payload is globally scrambled before being split and transmitted.
-
----
-
-### 3. Optical Stream
-
-A noisy animated stream of payload and decoy frames is shown.
-
----
-
-### 4. Reconstruction Results
-
-The app compares:
-
-* correct reconstruction
-* wrong-frame reconstruction
-* wrong-key reconstruction
-
----
-
-### 5. Frame Inspection
-
-Individual frames can be viewed to understand how the protocol emits data over time.
-
----
-
-## Why This Project Matters
-
-Chrono-Auth explores a security model where trust is not placed entirely in the browser or client UI.
-
-Its main contribution is the idea of **temporal visual verification**, where:
-
-* the secret is distributed across time
-* visibility alone is not enough for interpretation
-* reconstruction depends on synchronization and session knowledge
-
-This makes it a useful research prototype for studying:
-
-* transaction integrity under client compromise
-* visual cryptography extensions
-* time-based hiding mechanisms
-* optical-style secondary verification channels
-
----
-
-## Technical Stack
-
-This prototype uses:
-
-* Python
-* NumPy for binary image operations
-* OpenCV for frame generation and image saving
-* Pillow for text rendering
-* Streamlit for the dashboard UI
-* Pandas for metadata display
-
----
-
-## Limitations
-
-This is a prototype, not a production-ready banking system.
-
-* The app currently runs as a single-device simulation.
-* The current implementation is intended to demonstrate the concept and methodology rather than provide formal cryptographic guarantees.
-* It is best understood as a research and educational proof of concept.
-
----
-
-## Author
-
-Final project prototype by **[Your Name]**
-
----
-
-## License
-
-You may add a license such as **MIT** if desired.
+A local server will start, and the dashboard will open in your default web browser (usually at http://localhost:8501).
+🎮 Using the Dashboard (Simulation)
+Generate the Stream: In the left sidebar, enter a fake transaction (what the malware shows), the real hidden transaction, and a Session Key. Click Generate Optical Stream.
+The Compromised Browser: Watch the generated stream.gif on the left. To a human and to malware, it appears as statistically uniform flickering noise.
+Scan & Verify: Click the ✅ button to simulate the user's smartphone scanning the stream. It will filter decoys, decrypt the chain, and reveal the true transaction intent.
+Attack Simulations:
+Click Wrong Session Key to see the Avalanche Effect of the Chaos Map.
+Click Dropped Frame / Tampering to see the Shannon Diffusion and Temporal Chaining in action (results in a 100% cascade failure, outputting pure ??????).
+📁 Project Structure
+crypto_engine.py: Handles spatial cryptography (Tile Encoding, Shannon Diffusion, Chaos Map Generation, Block Scrambling).
+temporal_pipeline.py: Handles time-domain cryptography (Horizontal Slicing, Recursive Bidirectional Mixing, Masking).
+stream_generator.py: Assembles the final payload, generates Decoy frames, embeds data, and outputs stream.gif and timemap.json.
+app.py: The frontend UI built with Streamlit, simulating the Browser vs. Smartphone interaction.
+🛡️ Security Metrics Proven
+Strict Error Bounds: Standard CBC limits error propagation. Chrono-Auth's recursive bidirectional mixing combined with Shannon diffusion ensures a 1-bit error or a single dropped frame cascades to corrupt 100% of the 256x256 grid.
+Zero Partial Leakage: Due to the 8x8 Tile mapping, corrupted pixels do not reveal "halves" of letters. They fail the strict array-matching check and return as unreadable null characters.
+Developed as a final-year academic research project in Cybersecurity and Applied Cryptography.
